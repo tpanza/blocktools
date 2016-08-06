@@ -1,4 +1,5 @@
 from blocktools import *
+import csv
 
 class BlockHeader:
 	def __init__(self, blockchain):
@@ -15,9 +16,13 @@ class BlockHeader:
 		print "Time\t\t %s" % str(self.time)
 		print "Difficulty\t %8x" % self.bits
 		print "Nonce\t\t %s" % self.nonce
+	def getBlockHeader(self):
+		return [self.version, hashStr(self.previousHash), hashStr(self.merkleHash), \
+			str(self.time), hex(self.bits), self.nonce]
 
 class Block:
-	def __init__(self, blockchain):
+	def __init__(self, blockchain, block_id):
+		self.block_id = block_id
 		self.continueParsing = True
 		self.magicNum = 0
 		self.blocksize = 0
@@ -38,7 +43,7 @@ class Block:
 			self.Txs = []
 
 			for i in range(0, self.txCount):
-				tx = Tx(blockchain)
+				tx = Tx(blockchain, fkey_block_id=self.block_id, trans_pos=i)
 				self.Txs.append(tx)
 		else:
 			self.continueParsing = False
@@ -78,20 +83,29 @@ class Block:
 		print "##### Tx Count: %d" % self.txCount
 		for t in self.Txs:
 			t.toString()
+			t.toCSV()
+
+	def toCSV(self, block_csv_filename="blocks.csv"):
+		with open(block_csv_filename, 'a') as f:
+			writer = csv.writer(f)
+			writer.writerow([self.block_id, hex(self.magicNum), self.blocksize] + \
+				self.blockHeader.getBlockHeader()) 
 
 class Tx:
-	def __init__(self, blockchain):
+	def __init__(self, blockchain, fkey_block_id, trans_pos):
+		self.block_id = fkey_block_id
+		self.trans_pos = trans_pos
 		self.version = uint4(blockchain)
 		self.inCount = varint(blockchain)
 		self.inputs = []
 		for i in range(0, self.inCount):
-			input = txInput(blockchain)
+			input = txInput(blockchain, self.block_id, self.trans_pos, i)
 			self.inputs.append(input)
 		self.outCount = varint(blockchain)
 		self.outputs = []
 		if self.outCount > 0:
 			for i in range(0, self.outCount):
-				output = txOutput(blockchain)
+				output = txOutput(blockchain, self.block_id, self.trans_pos, i)
 				self.outputs.append(output)	
 		self.lockTime = uint4(blockchain)
 		
@@ -102,15 +116,26 @@ class Tx:
 		print "Inputs:\t\t %d" % self.inCount
 		for i in self.inputs:
 			i.toString()
+			i.toCSV()
 
 		print "Outputs:\t %d" % self.outCount
 		for o in self.outputs:
 			o.toString()
+			o.toCSV()
 		print "Lock Time:\t %d" % self.lockTime
+
+	def toCSV(self, transaction_csv_filename="transactions.csv"):
+		with open(transaction_csv_filename, 'a') as f:
+			writer = csv.writer(f)
+			writer.writerow([self.block_id, self.trans_pos, self.version, self.inCount, \
+				self.outCount, self.lockTime])
 				
 
 class txInput:
-	def __init__(self, blockchain):
+	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_in_pos):
+		self.block_id = fkey_block_id
+		self.trans_pos = fkey_trans_pos
+		self.tx_in_pos = tx_in_pos
 		self.prevhash = hash32(blockchain)
 		self.txOutId = uint4(blockchain)
 		self.scriptLen = varint(blockchain)
@@ -123,9 +148,18 @@ class txInput:
 		print "Script Length:\t %d" % self.scriptLen
 		print "Script Sig:\t %s" % hashStr(self.scriptSig)
 		print "Sequence:\t %8x" % self.seqNo
+
+	def toCSV(self, tx_in_csv_filename="tx_in.csv"):
+		with open(tx_in_csv_filename, 'a') as f:
+			writer = csv.writer(f)
+			writer.writerow([self.block_id, self.trans_pos, self.tx_in_pos, hashStr(self.prevhash), \
+				hex(self.txOutId), self.scriptLen, hashStr(self.scriptSig), hex(self.seqNo)])
 		
 class txOutput:
-	def __init__(self, blockchain):	
+	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_out_pos):
+		self.block_id = fkey_block_id
+		self.trans_pos = fkey_trans_pos
+		self.tx_out_pos = tx_out_pos
 		self.value = uint8(blockchain)
 		self.scriptLen = varint(blockchain)
 		self.pubkey = blockchain.read(self.scriptLen)
@@ -134,3 +168,10 @@ class txOutput:
 		print "Value:\t\t %d" % self.value
 		print "Script Len:\t %d" % self.scriptLen
 		print "Pubkey:\t\t %s" % hashStr(self.pubkey)
+	
+	def toCSV(self, tx_out_csv_filename="tx_out.csv"):
+		with open(tx_out_csv_filename, 'a') as f:
+			writer = csv.writer(f)
+			writer.writerow([self.block_id, self.trans_pos, self.tx_out_pos, self.value, \
+				self.scriptLen, hashStr(self.pubkey)])
+

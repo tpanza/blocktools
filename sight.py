@@ -11,10 +11,11 @@ def parse(blockchain):
 	fSize = blockchain.tell() - 80 #Minus last Block header size for partial file
 	blockchain.seek(0, 0)
 	while continueParsing:	
-		block = Block(blockchain)
+		block = Block(blockchain, counter)
 		continueParsing = block.continueParsing
 		if continueParsing:
 			block.toString()
+			block.toCSV()
 		counter+=1
 
 	print ''
