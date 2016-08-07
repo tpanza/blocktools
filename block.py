@@ -2,7 +2,7 @@ from blocktools import *
 import csv
 
 class BlockHeader:
-	def __init__(self, blockchain):
+	def __init__(self, blockchain, debug=False):
 		self.version = uint4(blockchain)
 		self.previousHash = hash32(blockchain)
 		self.merkleHash = hash32(blockchain)
@@ -21,7 +21,7 @@ class BlockHeader:
 			str(self.time), hex(self.bits), self.nonce]
 
 class Block:
-	def __init__(self, blockchain, block_id):
+	def __init__(self, blockchain, block_id, debug=False):
 		self.block_id = block_id
 		self.continueParsing = True
 		self.magicNum = 0
@@ -29,6 +29,7 @@ class Block:
 		self.blockheader = ''
 		self.txCount = 0
 		self.Txs = []
+		self.debug = debug
 
 		if self.hasLength(blockchain, 8):	
 			self.magicNum = uint4(blockchain)
@@ -43,7 +44,7 @@ class Block:
 			self.Txs = []
 
 			for i in range(0, self.txCount):
-				tx = Tx(blockchain, fkey_block_id=self.block_id, trans_pos=i)
+				tx = Tx(blockchain, fkey_block_id=self.block_id, trans_pos=i, debug=self.debug)
 				self.Txs.append(tx)
 		else:
 			self.continueParsing = False
@@ -70,7 +71,7 @@ class Block:
 
 
 	def setHeader(self, blockchain):
-		self.blockHeader = BlockHeader(blockchain)
+		self.blockHeader = BlockHeader(blockchain, debug=self.debug)
 
 	def toString(self):
 		print ""
@@ -78,23 +79,25 @@ class Block:
 		print "Blocksize: \t", self.blocksize
 		print ""
 		print "#"*10 + " Block Header " + "#"*10
-		self.blockHeader.toString()
+		if self.debug: self.blockHeader.toString()
 		print 
 		print "##### Tx Count: %d" % self.txCount
 		for t in self.Txs:
-			t.toString()
-			t.toCSV()
+			if self.debug: t.toString()
 
 	def toCSV(self, block_csv_filename="blocks.csv"):
 		with open(block_csv_filename, 'a') as f:
 			writer = csv.writer(f)
 			writer.writerow([self.block_id, hex(self.magicNum), self.blocksize] + \
 				self.blockHeader.getBlockHeader()) 
+		for t in self.Txs:
+			t.toCSV()
 
 class Tx:
-	def __init__(self, blockchain, fkey_block_id, trans_pos):
+	def __init__(self, blockchain, fkey_block_id, trans_pos, debug=False):
 		self.block_id = fkey_block_id
 		self.trans_pos = trans_pos
+		self.debug = debug
 		self.version = uint4(blockchain)
 		self.inCount = varint(blockchain)
 		self.inputs = []
@@ -116,12 +119,10 @@ class Tx:
 		print "Inputs:\t\t %d" % self.inCount
 		for i in self.inputs:
 			i.toString()
-			i.toCSV()
 
 		print "Outputs:\t %d" % self.outCount
 		for o in self.outputs:
 			o.toString()
-			o.toCSV()
 		print "Lock Time:\t %d" % self.lockTime
 
 	def toCSV(self, transaction_csv_filename="transactions.csv"):
@@ -129,10 +130,14 @@ class Tx:
 			writer = csv.writer(f)
 			writer.writerow([self.block_id, self.trans_pos, self.version, self.inCount, \
 				self.outCount, self.lockTime])
+		for i in self.inputs:
+			i.toCSV()
+		for o in self.outputs:
+			o.toCSV()
 				
 
 class txInput:
-	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_in_pos):
+	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_in_pos, debug=False):
 		self.block_id = fkey_block_id
 		self.trans_pos = fkey_trans_pos
 		self.tx_in_pos = tx_in_pos
@@ -156,7 +161,7 @@ class txInput:
 				hex(self.txOutId), self.scriptLen, hashStr(self.scriptSig), hex(self.seqNo)])
 		
 class txOutput:
-	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_out_pos):
+	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_out_pos, debug=False):
 		self.block_id = fkey_block_id
 		self.trans_pos = fkey_trans_pos
 		self.tx_out_pos = tx_out_pos
