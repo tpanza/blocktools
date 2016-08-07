@@ -21,8 +21,9 @@ class BlockHeader:
 			str(self.time), hex(self.bits), self.nonce]
 
 class Block:
-	def __init__(self, blockchain, block_id, debug=False):
+	def __init__(self, blockchain, block_id, datfilenum, debug=False):
 		self.block_id = block_id
+		self.datfilenum = datfilenum
 		self.continueParsing = True
 		self.magicNum = 0
 		self.blocksize = 0
@@ -88,7 +89,7 @@ class Block:
 	def toCSV(self, block_csv_filename="blocks.csv"):
 		with open(block_csv_filename, 'a') as f:
 			writer = csv.writer(f)
-			writer.writerow([self.block_id, hex(self.magicNum), self.blocksize] + \
+			writer.writerow([self.block_id, self.datfilenum, hex(self.magicNum), self.blocksize] + \
 				self.blockHeader.getBlockHeader()) 
 		for t in self.Txs:
 			t.toCSV()

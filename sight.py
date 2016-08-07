@@ -5,7 +5,7 @@ import subprocess
 from blocktools import *
 from block import Block, BlockHeader
 
-def parse(blockchain, block_counter_start=0, debug=False):
+def parse(blockchain, block_counter_start=0, datfilenum=0, debug=False):
 	if debug: print 'print Parsing Block Chain'
 	continueParsing = True
 	counter = block_counter_start
@@ -13,7 +13,7 @@ def parse(blockchain, block_counter_start=0, debug=False):
 	fSize = blockchain.tell() - 80 #Minus last Block header size for partial file
 	blockchain.seek(0, 0)
 	while continueParsing:	
-		block = Block(blockchain, counter, debug)
+		block = Block(blockchain, counter, datfilenum, debug)
 		continueParsing = block.continueParsing
 		if continueParsing:
 			if debug: block.toString()
@@ -41,12 +41,12 @@ def main(debug, start_file_num):
 				print "Error: blocks.csv already exists but we are processing first dat file"
 				raise SystemExit
 			with open(blk_filename, 'rb') as blockchain:
-				parse(blockchain, block_counter_start=0, debug=debug)
+				parse(blockchain, block_counter_start=0, datfilenum=datfilenum, debug=debug)
 		elif datfilenum > 0 and os.path.isfile('blocks.csv'):
 			last_line = subprocess.check_output(['tail', '-n', '1', 'blocks.csv']).rstrip()
 			last_block_num = int(last_line.split(',')[0])
 			with open(blk_filename, 'rb') as blockchain:
-				parse(blockchain, block_counter_start=last_block_num+1, debug=debug)
+				parse(blockchain, block_counter_start=last_block_num+1, datfilenum=datfilenum, debug=debug)
 		else:
 			print "Nothing to do. datfilenum:", datfilenum, "blk_filename:", blk_filename, "(", num_bytes, " bytes), blocks.csv exists?", os.path.isfile('blocks.csv')
 		print "Deleting:", blk_filename
