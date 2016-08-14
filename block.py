@@ -1,5 +1,6 @@
 from blocktools import *
 import csv
+import subprocess
 
 class BlockHeader:
 	def __init__(self, blockchain, debug=False):
@@ -45,7 +46,7 @@ class Block:
 			self.Txs = []
 
 			for i in range(0, self.txCount):
-				tx = Tx(blockchain, fkey_block_id=self.block_id, trans_pos=i, debug=self.debug)
+				tx = Tx(blockchain, fkey_block_id=self.block_id, trans_pos=i, datfilenum=self.datfilenum, debug=self.debug)
 				self.Txs.append(tx)
 		else:
 			self.continueParsing = False
@@ -90,26 +91,30 @@ class Block:
 		with open(block_csv_filename, 'a') as f:
 			writer = csv.writer(f)
 			writer.writerow([self.block_id, self.datfilenum, hex(self.magicNum), self.blocksize] + \
-				self.blockHeader.getBlockHeader()) 
+				self.blockHeader.getBlockHeader())
+		#cmd = ["aws", "s3", "cp", block_csv_filename, "s3://w205-project/blocks_stream/"+block_csv_filename]
+		#print ' '.join(cmd)
+		#subprocess.call(cmd)
 		for t in self.Txs:
-			t.toCSV()
+			t.toCSV(transaction_csv_filename='transactions'+'{0:05d}'.format(self.datfilenum)+'.csv')
 
 class Tx:
-	def __init__(self, blockchain, fkey_block_id, trans_pos, debug=False):
+	def __init__(self, blockchain, fkey_block_id, trans_pos, datfilenum, debug=False):
 		self.block_id = fkey_block_id
 		self.trans_pos = trans_pos
+		self.datfilenum = datfilenum
 		self.debug = debug
 		self.version = uint4(blockchain)
 		self.inCount = varint(blockchain)
 		self.inputs = []
 		for i in range(0, self.inCount):
-			input = txInput(blockchain, self.block_id, self.trans_pos, i)
+			input = txInput(blockchain, self.block_id, self.trans_pos, i, self.datfilenum)
 			self.inputs.append(input)
 		self.outCount = varint(blockchain)
 		self.outputs = []
 		if self.outCount > 0:
 			for i in range(0, self.outCount):
-				output = txOutput(blockchain, self.block_id, self.trans_pos, i)
+				output = txOutput(blockchain, self.block_id, self.trans_pos, i, self.datfilenum)
 				self.outputs.append(output)	
 		self.lockTime = uint4(blockchain)
 		
@@ -126,19 +131,22 @@ class Tx:
 			o.toString()
 		print "Lock Time:\t %d" % self.lockTime
 
-	def toCSV(self, transaction_csv_filename="transactions.csv"):
+	def toCSV(self, transaction_csv_filename):
 		with open(transaction_csv_filename, 'a') as f:
 			writer = csv.writer(f)
 			writer.writerow([self.block_id, self.trans_pos, self.version, self.inCount, \
 				self.outCount, self.lockTime])
+		#cmd = ["aws", "s3", "cp", transaction_csv_filename, "s3://w205-project/transactions_stream/"+transaction_csv_filename]
+		#print ' '.join(cmd)
+		#subprocess.call(cmd)
 		for i in self.inputs:
-			i.toCSV()
+			i.toCSV(tx_in_csv_filename="tx_in"+'{0:05d}'.format(self.datfilenum)+".csv")
 		for o in self.outputs:
-			o.toCSV()
+			o.toCSV(tx_out_csv_filename="tx_out"+'{0:05d}'.format(self.datfilenum)+".csv")
 				
 
 class txInput:
-	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_in_pos, debug=False):
+	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_in_pos, datfilenum, debug=False):
 		self.block_id = fkey_block_id
 		self.trans_pos = fkey_trans_pos
 		self.tx_in_pos = tx_in_pos
@@ -147,6 +155,7 @@ class txInput:
 		self.scriptLen = varint(blockchain)
 		self.scriptSig = blockchain.read(self.scriptLen)
 		self.seqNo = uint4(blockchain)
+		self.datfilenum = datfilenum
 
 	def toString(self):
 		print "Previous Hash:\t %s" % hashStr(self.prevhash)
@@ -155,17 +164,21 @@ class txInput:
 		print "Script Sig:\t %s" % hashStr(self.scriptSig)
 		print "Sequence:\t %8x" % self.seqNo
 
-	def toCSV(self, tx_in_csv_filename="tx_in.csv"):
+	def toCSV(self, tx_in_csv_filename):
 		with open(tx_in_csv_filename, 'a') as f:
 			writer = csv.writer(f)
 			writer.writerow([self.block_id, self.trans_pos, self.tx_in_pos, hashStr(self.prevhash), \
 				hex(self.txOutId), self.scriptLen, hashStr(self.scriptSig), hex(self.seqNo)])
+		#cmd = ["aws", "s3", "cp", tx_in_csv_filename, "s3://w205-project/tx_in_stream/"+tx_in_csv_filename]
+		#print ' '.join(cmd)
+		#subprocess.call(cmd)
 		
 class txOutput:
-	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_out_pos, debug=False):
+	def __init__(self, blockchain, fkey_block_id, fkey_trans_pos, tx_out_pos, datfilenum, debug=False):
 		self.block_id = fkey_block_id
 		self.trans_pos = fkey_trans_pos
 		self.tx_out_pos = tx_out_pos
+		self.datfilenum = datfilenum
 		self.value = uint8(blockchain)
 		self.scriptLen = varint(blockchain)
 		self.pubkey = blockchain.read(self.scriptLen)
@@ -175,9 +188,12 @@ class txOutput:
 		print "Script Len:\t %d" % self.scriptLen
 		print "Pubkey:\t\t %s" % hashStr(self.pubkey)
 	
-	def toCSV(self, tx_out_csv_filename="tx_out.csv"):
+	def toCSV(self, tx_out_csv_filename):
 		with open(tx_out_csv_filename, 'a') as f:
 			writer = csv.writer(f)
 			writer.writerow([self.block_id, self.trans_pos, self.tx_out_pos, self.value, \
 				self.scriptLen, hashStr(self.pubkey)])
+		#cmd = ["aws", "s3", "cp", tx_out_csv_filename, "s3://w205-project/tx_out_stream/"+tx_out_csv_filename]
+		#print ' '.join(cmd)
+		#subprocess.call(cmd)
 

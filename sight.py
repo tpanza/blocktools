@@ -17,12 +17,34 @@ def parse(blockchain, block_counter_start=0, datfilenum=0, debug=False):
 		continueParsing = block.continueParsing
 		if continueParsing:
 			if debug: block.toString()
-			block.toCSV()
+			block.toCSV(block_csv_filename='blocks'+'{0:05d}'.format(datfilenum)+'.csv')
 		counter+=1
 
 	if debug: print ''
 	if debug: print 'Reached End of Field'
 	if debug: print 'Parsed %s blocks', counter
+	return counter
+
+def make_stream_csv(dat_file_name, last_block_num, debug=False):
+	# must be running on same machine as bitcoind client
+	print "Making CSV with: dat_file_name:", dat_file_name, "last block num:", last_block_num
+	datfilenum = int(filter(str.isdigit, dat_file_name))
+	new_blocks_parsed = 0
+	with open(dat_file_name, 'rb') as blockchain:
+		new_blocks_parsed = parse(blockchain, block_counter_start=last_block_num+1, datfilenum=datfilenum, debug=debug)
+	blocks_csv_filename = 'blocks'+'{0:05d}'.format(datfilenum)+'.csv'
+	subprocess.call(['aws', 's3', 'cp', blocks_csv_filename, 's3://w205-project/blocks_stream/'+blocks_csv_filename])
+	transaction_csv_filename='transactions'+'{0:05d}'.format(datfilenum)+'.csv'
+	subprocess.call(['aws', 's3', 'cp', transaction_csv_filename, 's3://w205-project/transactions_stream/'+transaction_csv_filename])
+	tx_in_csv_filename="tx_in"+'{0:05d}'.format(datfilenum)+".csv"
+	subprocess.call(['aws', 's3', 'cp', tx_in_csv_filename, 's3://w205-project/tx_in_stream/'+tx_in_csv_filename])
+	tx_out_csv_filename="tx_out"+'{0:05d}'.format(datfilenum)+".csv"
+	subprocess.call(['aws', 's3', 'cp', tx_out_csv_filename, 's3://w205-project/tx_out_stream/'+tx_out_csv_filename])
+	os.remove(blocks_csv_filename)
+	os.remove(transaction_csv_filename)
+	os.remove(tx_in_csv_filename)
+	os.remove(tx_out_csv_filename)
+	return last_block_num + new_blocks_parsed
 
 def main(debug, start_file_num):
 	print "Running with debug=",debug, "start_file_num=",start_file_num
